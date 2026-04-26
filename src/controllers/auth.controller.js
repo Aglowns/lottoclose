@@ -41,8 +41,27 @@ async function signup(req, res) {
     throw new Error(userErr.message);
   }
 
+  // Auto-import the state's scratch-off library so the store has a working
+  // price book on day one. Owner can deactivate games they don't sell from
+  // the Price Book screen.
+  await seedStoreFromLibrary(store.id, state);
+
   const tokens = signTokens(user);
   res.status(201).json({ ...tokens, user: formatUser(user), store });
+}
+
+async function seedStoreFromLibrary(storeId, stateCode) {
+  const { data: library } = await supabase
+    .from('games')
+    .select('game_number, name, price, state, status, source')
+    .is('store_id', null)
+    .eq('state', stateCode.toUpperCase())
+    .eq('status', 'active');
+
+  if (!library || library.length === 0) return;
+
+  const rows = library.map((g) => ({ ...g, store_id: storeId }));
+  await supabase.from('games').insert(rows);
 }
 
 // POST /auth/login
