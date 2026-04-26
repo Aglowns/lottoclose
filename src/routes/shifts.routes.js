@@ -17,6 +17,7 @@ const addScanSchema = z.object({
 
 const closeShiftSchema = z.object({
   cashInDrawer: z.number().min(0).optional(),
+  onlineLotterySales: z.number().min(0).optional(),
   notes: z.string().max(500).optional(),
 });
 

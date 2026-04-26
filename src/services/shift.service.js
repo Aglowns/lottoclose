@@ -1,7 +1,7 @@
 const supabase = require('../db/supabase');
 const { sendShortageAlert } = require('./notification.service');
 
-async function recalculateAndCloseShift(shift, cashInDrawer, notes, callerUser) {
+async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales, notes, callerUser) {
   const shiftId = shift.id;
   const storeId = shift.store_id;
 
@@ -34,13 +34,16 @@ async function recalculateAndCloseShift(shift, cashInDrawer, notes, callerUser) 
       .eq('id', s.id);
   }
 
+  // Online lottery sales (read from terminal slip) are added to total expected
+  // cash so that over_short reflects the full cashier drawer, not just scratch-offs.
+  const expectedCash = totalSales + (onlineLotterySales ?? 0);
   const overShort =
-    cashInDrawer != null ? parseFloat((cashInDrawer - totalSales).toFixed(2)) : null;
+    cashInDrawer != null ? parseFloat((cashInDrawer - expectedCash).toFixed(2)) : null;
 
   const now = new Date().toISOString();
 
   // Close the shift
-  const { data: closedShift, error: closeErr } = await supabase
+  const { error: closeErr } = await supabase
     .from('shifts')
     .update({
       status: 'closed',
@@ -48,6 +51,7 @@ async function recalculateAndCloseShift(shift, cashInDrawer, notes, callerUser) 
       total_tickets_sold: totalTicketsSold,
       total_sales: parseFloat(totalSales.toFixed(2)),
       cash_in_drawer: cashInDrawer ?? null,
+      online_lottery_sales: onlineLotterySales ?? null,
       over_short: overShort,
       notes: notes ?? null,
     })
