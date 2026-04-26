@@ -61,6 +61,53 @@ async function getCarryover(req, res) {
   res.json(data);
 }
 
+// POST /shifts/activate-pack
+// Body: { gameId, packNumber, startingTicket? }
+// Resets carryover for this (store, game) so subsequent end-scans calculate
+// from this new pack's starting point. Default startingTicket = 1.
+async function activatePack(req, res) {
+  const { storeId } = req.user;
+  const { gameId, packNumber, startingTicket } = req.body;
+
+  // Confirm the game exists in this store
+  const { data: game } = await supabase
+    .from('games')
+    .select('id, name')
+    .eq('id', gameId)
+    .eq('store_id', storeId)
+    .maybeSingle();
+
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found in your store.' });
+  }
+
+  // last_ticket_number = startingTicket - 1 so end-of-shift scan computes
+  // tickets_sold = end - (start - 1) = end - start + 1, counting the first
+  // ticket of the pack as one ticket sold.
+  const start = startingTicket ?? 1;
+  const lastTicket = Math.max(0, start - 1);
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('carryover')
+    .upsert(
+      {
+        store_id: storeId,
+        game_id: gameId,
+        pack_number: String(packNumber),
+        last_ticket_number: lastTicket,
+        last_shift_id: null,
+        updated_at: now,
+      },
+      { onConflict: 'store_id,game_id' },
+    )
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  res.status(201).json(data);
+}
+
 // POST /shifts/:id/scan
 async function addScan(req, res) {
   const { id: shiftId } = req.params;
@@ -240,6 +287,7 @@ module.exports = {
   openShift,
   getCurrentShift,
   getCarryover,
+  activatePack,
   addScan,
   deleteScan,
   closeShift,

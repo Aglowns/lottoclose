@@ -15,6 +15,12 @@ const addScanSchema = z.object({
   isNewRoll: z.boolean().optional().default(false),
 });
 
+const activatePackSchema = z.object({
+  gameId: z.string().uuid(),
+  packNumber: z.string().min(1).max(20),
+  startingTicket: z.number().int().min(0).optional(),
+});
+
 const closeShiftSchema = z.object({
   cashInDrawer: z.number().min(0).optional(),
   onlineLotterySales: z.number().min(0).optional(),
@@ -24,6 +30,7 @@ const closeShiftSchema = z.object({
 router.post('/open', ctrl.openShift);
 router.get('/current', ctrl.getCurrentShift);
 router.get('/carryover', ctrl.getCarryover);
+router.post('/activate-pack', validateBody(activatePackSchema), ctrl.activatePack);
 router.get('/', ctrl.listShifts);
 router.get('/:id', ctrl.getShift);
 router.post('/:id/scan', validateBody(addScanSchema), ctrl.addScan);
