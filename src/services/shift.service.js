@@ -34,11 +34,26 @@ async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales,
       .eq('id', s.id);
   }
 
-  // Online lottery sales (read from terminal slip) are added to total expected
-  // cash so that over_short reflects the full cashier drawer, not just scratch-offs.
+  // Reconciliation math (industry-standard "float" method):
+  //   - Cashier counts the FULL drawer at end of shift (includes the float
+  //     they keep for next shift's change).
+  //   - cashHandedIn = drawerCount - drawerFloat (= what owner takes home).
+  //   - expectedCash = lotteryTotal + onlineLotterySales.
+  //   - overShort   = cashHandedIn - expectedCash.
+  //     Negative = short (missing money), positive = over.
+  const { data: storeRow } = await supabase
+    .from('stores')
+    .select('drawer_float')
+    .eq('id', storeId)
+    .maybeSingle();
+  const drawerFloat = parseFloat(storeRow?.drawer_float ?? 0) || 0;
+
   const expectedCash = totalSales + (onlineLotterySales ?? 0);
-  const overShort =
-    cashInDrawer != null ? parseFloat((cashInDrawer - expectedCash).toFixed(2)) : null;
+  const cashHandedIn =
+    cashInDrawer != null ? cashInDrawer - drawerFloat : null;
+  const overShort = cashHandedIn != null
+    ? parseFloat((cashHandedIn - expectedCash).toFixed(2))
+    : null;
 
   const now = new Date().toISOString();
 

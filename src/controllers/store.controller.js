@@ -17,11 +17,16 @@ async function getStore(req, res) {
 // PUT /store
 async function updateStore(req, res) {
   const { storeId } = req.user;
-  const { name, address } = req.body;
+  const { name, address, drawerFloat } = req.body;
+
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (address !== undefined) updates.address = address;
+  if (drawerFloat !== undefined) updates.drawer_float = drawerFloat;
 
   const { data, error } = await supabase
     .from('stores')
-    .update({ name, address })
+    .update(updates)
     .eq('id', storeId)
     .select()
     .single();

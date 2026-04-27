@@ -11,6 +11,7 @@ router.use(authenticate);
 const updateStoreSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   address: z.string().max(255).optional(),
+  drawerFloat: z.number().min(0).optional(),
 });
 
 const fcmTokenSchema = z.object({
