@@ -1,7 +1,7 @@
 const supabase = require('../db/supabase');
 const { sendShortageAlert } = require('./notification.service');
 
-async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales, notes, callerUser) {
+async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales, drawerFloatUsed, notes, callerUser) {
   const shiftId = shift.id;
   const storeId = shift.store_id;
 
@@ -41,12 +41,17 @@ async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales,
   //   - expectedCash = lotteryTotal + onlineLotterySales.
   //   - overShort   = cashHandedIn - expectedCash.
   //     Negative = short (missing money), positive = over.
-  const { data: storeRow } = await supabase
-    .from('stores')
-    .select('drawer_float')
-    .eq('id', storeId)
-    .maybeSingle();
-  const drawerFloat = parseFloat(storeRow?.drawer_float ?? 0) || 0;
+  // Float can vary day-to-day. Use what the cashier typed at close time;
+  // fall back to the store's configured default if they didn't override.
+  let drawerFloat = drawerFloatUsed;
+  if (drawerFloat == null) {
+    const { data: storeRow } = await supabase
+      .from('stores')
+      .select('drawer_float')
+      .eq('id', storeId)
+      .maybeSingle();
+    drawerFloat = parseFloat(storeRow?.drawer_float ?? 0) || 0;
+  }
 
   const expectedCash = totalSales + (onlineLotterySales ?? 0);
   const cashHandedIn =

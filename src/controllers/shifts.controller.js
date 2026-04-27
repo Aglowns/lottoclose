@@ -192,7 +192,7 @@ async function deleteScan(req, res) {
 async function closeShift(req, res) {
   const { id: shiftId } = req.params;
   const { sub: userId } = req.user;
-  const { cashInDrawer, onlineLotterySales, notes } = req.body;
+  const { cashInDrawer, onlineLotterySales, drawerFloatUsed, notes } = req.body;
 
   const shift = await requireOwnOpenShift(shiftId, userId);
 
@@ -206,6 +206,7 @@ async function closeShift(req, res) {
     shift,
     cashInDrawer ?? null,
     onlineLotterySales ?? null,
+    drawerFloatUsed ?? null,
     notes ?? null,
     callerUser ?? { name: 'Cashier' },
   );
