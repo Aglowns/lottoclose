@@ -34,30 +34,13 @@ async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales,
       .eq('id', s.id);
   }
 
-  // Reconciliation math (industry-standard "float" method):
-  //   - Cashier counts the FULL drawer at end of shift (includes the float
-  //     they keep for next shift's change).
-  //   - cashHandedIn = drawerCount - drawerFloat (= what owner takes home).
-  //   - expectedCash = lotteryTotal + onlineLotterySales.
-  //   - overShort   = cashHandedIn - expectedCash.
-  //     Negative = short (missing money), positive = over.
-  // Float can vary day-to-day. Use what the cashier typed at close time;
-  // fall back to the store's configured default if they didn't override.
-  let drawerFloat = drawerFloatUsed;
-  if (drawerFloat == null) {
-    const { data: storeRow } = await supabase
-      .from('stores')
-      .select('drawer_float')
-      .eq('id', storeId)
-      .maybeSingle();
-    drawerFloat = parseFloat(storeRow?.drawer_float ?? 0) || 0;
-  }
-
+  // cashInDrawer represents the cash the cashier handed in to the owner
+  // (after they separated and kept the float for the next shift).
+  // expectedCash = lotteryTotal + onlineLotterySales.
+  // overShort = cashInDrawer - expectedCash (negative = short, positive = over).
   const expectedCash = totalSales + (onlineLotterySales ?? 0);
-  const cashHandedIn =
-    cashInDrawer != null ? cashInDrawer - drawerFloat : null;
-  const overShort = cashHandedIn != null
-    ? parseFloat((cashHandedIn - expectedCash).toFixed(2))
+  const overShort = cashInDrawer != null
+    ? parseFloat((cashInDrawer - expectedCash).toFixed(2))
     : null;
 
   const now = new Date().toISOString();
