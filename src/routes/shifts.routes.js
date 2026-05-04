@@ -23,6 +23,7 @@ const activatePackSchema = z.object({
 
 const closeShiftSchema = z.object({
   cashInDrawer: z.number().min(0).optional(),
+  cashToOwner: z.number().min(0).optional(),
   onlineLotterySales: z.number().min(0).optional(),
   drawerFloatUsed: z.number().min(0).optional(),
   notes: z.string().max(500).optional(),
@@ -37,5 +38,6 @@ router.get('/:id', ctrl.getShift);
 router.post('/:id/scan', validateBody(addScanSchema), ctrl.addScan);
 router.delete('/:id/scan/:scanId', ctrl.deleteScan);
 router.post('/:id/close', validateBody(closeShiftSchema), ctrl.closeShift);
+router.patch('/:id/details', validateBody(closeShiftSchema), ctrl.updateShiftDetails);
 
 module.exports = router;

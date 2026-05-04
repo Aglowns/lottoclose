@@ -192,7 +192,7 @@ async function deleteScan(req, res) {
 async function closeShift(req, res) {
   const { id: shiftId } = req.params;
   const { sub: userId } = req.user;
-  const { cashInDrawer, onlineLotterySales, drawerFloatUsed, notes } = req.body;
+  const { cashInDrawer, cashToOwner, onlineLotterySales, drawerFloatUsed, notes } = req.body;
 
   const shift = await requireOwnOpenShift(shiftId, userId);
 
@@ -205,6 +205,7 @@ async function closeShift(req, res) {
   const closedShift = await recalculateAndCloseShift(
     shift,
     cashInDrawer ?? null,
+    cashToOwner ?? null,
     onlineLotterySales ?? null,
     drawerFloatUsed ?? null,
     notes ?? null,
@@ -212,6 +213,63 @@ async function closeShift(req, res) {
   );
 
   res.json(closedShift);
+}
+
+// PATCH /shifts/:id/details
+// Lets the cashier correct the closing numbers/notes after closing the shift.
+// Recomputes over_short whenever cashInDrawer/cashToOwner/onlineLotterySales change.
+async function updateShiftDetails(req, res) {
+  const { id: shiftId } = req.params;
+  const { sub: userId } = req.user;
+  const { cashInDrawer, cashToOwner, onlineLotterySales, notes } = req.body;
+
+  const { data: shift, error: fetchErr } = await supabase
+    .from('shifts')
+    .select('*')
+    .eq('id', shiftId)
+    .maybeSingle();
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!shift) return res.status(404).json({ error: 'Shift not found.' });
+  if (shift.user_id !== userId) {
+    return res.status(403).json({ error: 'Forbidden.' });
+  }
+
+  const nextCashInDrawer = cashInDrawer !== undefined ? cashInDrawer : shift.cash_in_drawer;
+  const nextCashToOwner = cashToOwner !== undefined ? cashToOwner : shift.cash_to_owner;
+  const nextOnline = onlineLotterySales !== undefined
+    ? onlineLotterySales
+    : shift.online_lottery_sales;
+
+  const totalRevenue = parseFloat(shift.total_sales ?? 0) + parseFloat(nextOnline ?? 0);
+  const expectedToOwner = nextCashInDrawer != null
+    ? parseFloat((totalRevenue - nextCashInDrawer).toFixed(2))
+    : null;
+  // Suppress over/short when expected is negative (data entry issue).
+  const overShort = (nextCashToOwner != null && expectedToOwner != null && expectedToOwner >= 0)
+    ? parseFloat((nextCashToOwner - expectedToOwner).toFixed(2))
+    : null;
+
+  const updates = {
+    cash_in_drawer: nextCashInDrawer,
+    cash_to_owner: nextCashToOwner,
+    online_lottery_sales: nextOnline,
+    over_short: overShort,
+  };
+  if (notes !== undefined) updates.notes = notes;
+
+  const { error: updateErr } = await supabase
+    .from('shifts')
+    .update(updates)
+    .eq('id', shiftId);
+  if (updateErr) throw new Error(updateErr.message);
+
+  const { data: full, error: refetchErr } = await supabase
+    .from('shifts')
+    .select('*, users(name), shift_scans(*, games(name, price))')
+    .eq('id', shiftId)
+    .single();
+  if (refetchErr) throw new Error(refetchErr.message);
+  res.json(full);
 }
 
 // GET /shifts/:id
@@ -292,6 +350,7 @@ module.exports = {
   addScan,
   deleteScan,
   closeShift,
+  updateShiftDetails,
   getShift,
   listShifts,
 };

@@ -1,7 +1,7 @@
 const supabase = require('../db/supabase');
 const { sendShortageAlert } = require('./notification.service');
 
-async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales, drawerFloatUsed, notes, callerUser) {
+async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, onlineLotterySales, drawerFloatUsed, notes, callerUser) {
   const shiftId = shift.id;
   const storeId = shift.store_id;
 
@@ -34,13 +34,19 @@ async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales,
       .eq('id', s.id);
   }
 
-  // cashInDrawer represents the cash the cashier handed in to the owner
-  // (after they separated and kept the float for the next shift).
-  // expectedCash = lotteryTotal + onlineLotterySales.
-  // overShort = cashInDrawer - expectedCash (negative = short, positive = over).
-  const expectedCash = totalSales + (onlineLotterySales ?? 0);
-  const overShort = cashInDrawer != null
-    ? parseFloat((cashInDrawer - expectedCash).toFixed(2))
+  // cashInDrawer = cash the cashier left in the drawer for the next shift
+  // (varies per shift — cashier decides). cashToOwner = cash physically counted
+  // to hand to the owner. Reconciliation:
+  //   expectedToOwner = totalSales + onlineLotterySales - cashInDrawer
+  //   overShort = cashToOwner - expectedToOwner (only when cashToOwner given).
+  const totalRevenue = totalSales + (onlineLotterySales ?? 0);
+  const expectedToOwner = cashInDrawer != null
+    ? parseFloat((totalRevenue - cashInDrawer).toFixed(2))
+    : null;
+  // Suppress over/short when expected is negative (cashier left more cash than
+  // the shift earned — data entry issue, not a real shortage).
+  const overShort = (cashToOwner != null && expectedToOwner != null && expectedToOwner >= 0)
+    ? parseFloat((cashToOwner - expectedToOwner).toFixed(2))
     : null;
 
   const now = new Date().toISOString();
@@ -54,6 +60,7 @@ async function recalculateAndCloseShift(shift, cashInDrawer, onlineLotterySales,
       total_tickets_sold: totalTicketsSold,
       total_sales: parseFloat(totalSales.toFixed(2)),
       cash_in_drawer: cashInDrawer ?? null,
+      cash_to_owner: cashToOwner ?? null,
       online_lottery_sales: onlineLotterySales ?? null,
       over_short: overShort,
       notes: notes ?? null,
