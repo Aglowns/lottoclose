@@ -230,7 +230,11 @@ async function updateShiftDetails(req, res) {
     .maybeSingle();
   if (fetchErr) throw new Error(fetchErr.message);
   if (!shift) return res.status(404).json({ error: 'Shift not found.' });
-  if (shift.user_id !== userId) {
+
+  const { role, storeId } = req.user;
+  // Owners can edit any shift in their store; cashiers can only edit their own.
+  const isOwner = role === 'owner' && shift.store_id === storeId;
+  if (!isOwner && shift.user_id !== userId) {
     return res.status(403).json({ error: 'Forbidden.' });
   }
 
