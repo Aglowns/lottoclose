@@ -3,9 +3,11 @@ const { z } = require('zod');
 const ctrl = require('../controllers/shifts.controller');
 const authenticate = require('../middleware/authenticate');
 const validateBody = require('../middleware/validateBody');
+const requireActiveSubscription = require('../middleware/requireActiveSubscription');
 
 const router = Router();
 router.use(authenticate);
+router.use(requireActiveSubscription);
 
 const addScanSchema = z.object({
   gameId: z.string().uuid(),
