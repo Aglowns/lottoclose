@@ -42,9 +42,31 @@ async function sendShortageAlert({ ownerFcmToken, cashierName, amount, storeName
       },
     });
   } catch (err) {
-    // Non-fatal — log and continue
     console.error('FCM send failed:', err.message);
   }
 }
 
-module.exports = { sendShortageAlert };
+async function sendShiftClosed({ ownerFcmToken, cashierName, totalSales, storeName, shiftId }) {
+  const fb = getAdmin();
+  if (!fb || !ownerFcmToken) return;
+
+  try {
+    await fb.messaging().send({
+      token: ownerFcmToken,
+      notification: {
+        title: `${storeName} — Shift Closed`,
+        body: `${cashierName} closed: $${Number(totalSales).toFixed(2)} in sales.`,
+      },
+      data: {
+        type: 'shift_closed',
+        shiftId: String(shiftId),
+        cashierName,
+        totalSales: String(totalSales),
+      },
+    });
+  } catch (err) {
+    console.error('FCM send failed:', err.message);
+  }
+}
+
+module.exports = { sendShortageAlert, sendShiftClosed };

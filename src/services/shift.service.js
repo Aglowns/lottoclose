@@ -1,5 +1,5 @@
 const supabase = require('../db/supabase');
-const { sendShortageAlert } = require('./notification.service');
+const { sendShortageAlert, sendShiftClosed } = require('./notification.service');
 
 async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, onlineLotterySales, drawerFloatUsed, notes, callerUser) {
   const shiftId = shift.id;
@@ -86,31 +86,43 @@ async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, online
     );
   }
 
-  // Send shortage notification if over_short < -5.00
-  if (overShort !== null && overShort < -5.0) {
-    const { data: owner } = await supabase
-      .from('users')
-      .select('fcm_token, name')
-      .eq('store_id', storeId)
-      .eq('role', 'owner')
-      .eq('status', 'active')
-      .limit(1)
-      .single();
+  // Fetch owner FCM token + store name once for all notifications below.
+  const { data: owner } = await supabase
+    .from('users')
+    .select('fcm_token')
+    .eq('store_id', storeId)
+    .eq('role', 'owner')
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle();
 
-    const { data: store } = await supabase
-      .from('stores')
-      .select('name')
-      .eq('id', storeId)
-      .single();
+  const { data: store } = await supabase
+    .from('stores')
+    .select('name')
+    .eq('id', storeId)
+    .maybeSingle();
 
-    if (owner?.fcm_token) {
-      await sendShortageAlert({
-        ownerFcmToken: owner.fcm_token,
-        cashierName: callerUser.name,
-        amount: overShort,
-        storeName: store?.name ?? 'Your store',
-      });
-    }
+  const storeName = store?.name ?? 'Your store';
+
+  // Always notify owner that a shift was closed.
+  if (owner?.fcm_token) {
+    await sendShiftClosed({
+      ownerFcmToken: owner.fcm_token,
+      cashierName: callerUser.name,
+      totalSales: parseFloat(totalSales.toFixed(2)),
+      storeName,
+      shiftId,
+    });
+  }
+
+  // Additional shortage alert if over_short < -5.00.
+  if (overShort !== null && overShort < -5.0 && owner?.fcm_token) {
+    await sendShortageAlert({
+      ownerFcmToken: owner.fcm_token,
+      cashierName: callerUser.name,
+      amount: overShort,
+      storeName,
+    });
   }
 
   // Return full shift with scans
