@@ -11,9 +11,11 @@ async function signup(req, res) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   // Create store
+  const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
   const { data: store, error: storeErr } = await supabase
     .from('stores')
-    .insert({ name: storeName, state })
+    .insert({ name: storeName, state, trial_ends_at: trialEndsAt })
     .select()
     .single();
 
