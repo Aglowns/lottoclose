@@ -96,29 +96,28 @@ async function login(req, res) {
 
 // POST /auth/pin-login
 async function pinLogin(req, res) {
-  const { storeId, name, pin } = req.body;
+  const { storeId, pin } = req.body;
 
   const { data: users } = await supabase
     .from('users')
     .select('*')
     .eq('store_id', storeId)
     .eq('role', 'cashier')
-    .eq('status', 'active')
-    .ilike('name', name.trim());
+    .eq('status', 'active');
 
   if (!users?.length) {
-    return res.status(401).json({ error: 'No cashier found with that name.' });
+    return res.status(401).json({ error: 'No active cashiers found for this store.' });
   }
 
   let user = null;
   for (const u of users) {
-    if (await bcrypt.compare(pin, u.pin)) {
+    if (u.pin && await bcrypt.compare(pin, u.pin)) {
       user = u;
       break;
     }
   }
 
-  if (!user) return res.status(401).json({ error: 'Invalid name or PIN.' });
+  if (!user) return res.status(401).json({ error: 'Incorrect PIN. Try again.' });
 
   const { data: store } = await supabase
     .from('stores')
