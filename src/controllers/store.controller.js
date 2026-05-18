@@ -40,7 +40,7 @@ async function listEmployees(req, res) {
   const { storeId } = req.user;
   const { data, error } = await supabase
     .from('users')
-    .select('id, name, role, status, created_at')
+    .select('id, store_id, name, role, status, created_at')
     .eq('store_id', storeId)
     .order('created_at');
 
