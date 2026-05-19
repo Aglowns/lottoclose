@@ -21,7 +21,6 @@ const loginSchema = z.object({
 
 const pinLoginSchema = z.object({
   storeId: z.string().uuid(),
-  name: z.string().min(1),
   pin: z.string().length(4),
 });
 
