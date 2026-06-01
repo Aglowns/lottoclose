@@ -41,5 +41,10 @@ app.use((err, _req, res, _next) => {
   res.status(status).json({ error: message });
 });
 
+const { startDailySummaryJob } = require('./src/jobs/dailySummary');
+
 const PORT = process.env.PORT ?? 3000;
-app.listen(PORT, () => console.log(`LottoClose API running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`LottoClose API running on port ${PORT}`);
+  startDailySummaryJob();
+});

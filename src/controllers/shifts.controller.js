@@ -1,5 +1,6 @@
 const supabase = require('../db/supabase');
 const { recalculateAndCloseShift } = require('../services/shift.service');
+const { sendPackActivated } = require('../services/notification.service');
 
 // POST /shifts/open
 async function openShift(req, res) {
@@ -105,6 +106,39 @@ async function activatePack(req, res) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  // Notify owner that a new pack was activated
+  const { data: owner } = await supabase
+    .from('users')
+    .select('fcm_token, name')
+    .eq('store_id', storeId)
+    .eq('role', 'owner')
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle();
+
+  const { data: store } = await supabase
+    .from('stores')
+    .select('name')
+    .eq('id', storeId)
+    .maybeSingle();
+
+  const { data: callerUser } = await supabase
+    .from('users')
+    .select('name')
+    .eq('id', req.user.sub)
+    .maybeSingle();
+
+  if (owner?.fcm_token) {
+    sendPackActivated({
+      ownerFcmToken: owner.fcm_token,
+      cashierName: callerUser?.name ?? 'Cashier',
+      gameName: game.name,
+      packNumber,
+      storeName: store?.name ?? 'Your store',
+    }).catch(() => {});
+  }
+
   res.status(201).json(data);
 }
 

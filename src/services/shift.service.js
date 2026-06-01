@@ -1,5 +1,5 @@
 const supabase = require('../db/supabase');
-const { sendShortageAlert, sendShiftClosed } = require('./notification.service');
+const { sendShiftClosed } = require('./notification.service');
 
 async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, onlineLotterySales, drawerFloatUsed, notes, callerUser) {
   const shiftId = shift.id;
@@ -104,7 +104,7 @@ async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, online
 
   const storeName = store?.name ?? 'Your store';
 
-  // Always notify owner that a shift was closed.
+  // Notify owner — single rich notification covering both closed + shortage.
   if (owner?.fcm_token) {
     await sendShiftClosed({
       ownerFcmToken: owner.fcm_token,
@@ -112,16 +112,8 @@ async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, online
       totalSales: parseFloat(totalSales.toFixed(2)),
       storeName,
       shiftId,
-    });
-  }
-
-  // Additional shortage alert if over_short < -5.00.
-  if (overShort !== null && overShort < -5.0 && owner?.fcm_token) {
-    await sendShortageAlert({
-      ownerFcmToken: owner.fcm_token,
-      cashierName: callerUser.name,
-      amount: overShort,
-      storeName,
+      packCount: scans.length,
+      overShort,
     });
   }
 
