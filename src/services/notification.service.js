@@ -134,4 +134,30 @@ async function sendShiftEdited({ ownerFcmToken, cashierName, storeName, shiftId,
   });
 }
 
-module.exports = { sendShiftClosed, sendShiftStarted, sendPackActivated, sendDailySummary, sendCashierJoined, sendShiftEdited };
+// New game/ticket added to price book — notify all cashiers
+async function sendNewGameAdded({ cashierFcmTokens, gameName, price, storeName }) {
+  const fb = getAdmin();
+  if (!fb || !cashierFcmTokens?.length) return;
+
+  const priceStr = `$${Number(price).toFixed(2)}`;
+  const message = {
+    notification: {
+      title: `${storeName} — New Ticket Added`,
+      body: `${gameName} (${priceStr}) is now in your price book.`,
+    },
+    data: { type: 'new_game', gameName, price: String(price) },
+    apns: { payload: { aps: { sound: 'default' } } },
+    android: { notification: { sound: 'default' } },
+  };
+
+  try {
+    await fb.messaging().sendEachForMulticast({
+      tokens: cashierFcmTokens,
+      ...message,
+    });
+  } catch (err) {
+    console.error('FCM multicast failed:', err.message);
+  }
+}
+
+module.exports = { sendShiftClosed, sendShiftStarted, sendPackActivated, sendDailySummary, sendCashierJoined, sendShiftEdited, sendNewGameAdded };

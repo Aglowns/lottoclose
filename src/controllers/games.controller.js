@@ -1,4 +1,5 @@
 const supabase = require('../db/supabase');
+const { sendNewGameAdded } = require('../services/notification.service');
 
 // GET /games
 async function listGames(req, res) {
@@ -53,6 +54,28 @@ async function addGame(req, res) {
       return res.status(409).json({ error: 'Game number already exists in your store.' });
     }
     throw new Error(error.message);
+  }
+
+  // Notify all active cashiers that a new ticket is available
+  const { data: cashiers } = await supabase
+    .from('users')
+    .select('fcm_token')
+    .eq('store_id', storeId)
+    .eq('role', 'cashier')
+    .eq('status', 'active')
+    .not('fcm_token', 'is', null);
+
+  const { data: store } = await supabase
+    .from('stores').select('name').eq('id', storeId).maybeSingle();
+
+  const tokens = (cashiers ?? []).map((c) => c.fcm_token).filter(Boolean);
+  if (tokens.length) {
+    sendNewGameAdded({
+      cashierFcmTokens: tokens,
+      gameName: name,
+      price,
+      storeName: store?.name ?? 'Your store',
+    }).catch(() => {});
   }
 
   res.status(201).json(data);
