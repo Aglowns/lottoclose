@@ -1,5 +1,6 @@
 const supabase = require('../db/supabase');
 const { sendShiftClosed } = require('./notification.service');
+const { sendShortageAlertEmail } = require('./email.service');
 
 async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, onlineLotterySales, drawerFloatUsed, notes, callerUser) {
   const shiftId = shift.id;
@@ -89,7 +90,7 @@ async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, online
   // Fetch owner FCM token + store name once for all notifications below.
   const { data: owner } = await supabase
     .from('users')
-    .select('fcm_token')
+    .select('fcm_token, email, name')
     .eq('store_id', storeId)
     .eq('role', 'owner')
     .eq('status', 'active')
@@ -104,7 +105,9 @@ async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, online
 
   const storeName = store?.name ?? 'Your store';
 
-  // Notify owner — single rich notification covering both closed + shortage.
+  const hasShortage = overShort !== null && overShort < -5;
+
+  // Push notification — covers both closed + shortage in one message
   if (owner?.fcm_token) {
     await sendShiftClosed({
       ownerFcmToken: owner.fcm_token,
@@ -115,6 +118,19 @@ async function recalculateAndCloseShift(shift, cashInDrawer, cashToOwner, online
       packCount: scans.length,
       overShort,
     });
+  }
+
+  // Email alert for shortages only
+  if (hasShortage && owner?.email) {
+    sendShortageAlertEmail({
+      to: owner.email,
+      ownerName: owner.name ?? 'there',
+      cashierName: callerUser.name,
+      storeName,
+      amount: overShort,
+      totalSales: parseFloat(totalSales.toFixed(2)),
+      shiftId,
+    }).catch(() => {});
   }
 
   // Return full shift with scans

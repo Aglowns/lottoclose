@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const supabase = require('../db/supabase');
 const { sendDailySummary } = require('../services/notification.service');
+const { sendDailySummaryEmail } = require('../services/email.service');
 
 // Runs every day at 11 PM Eastern (03:00 UTC)
 function startDailySummaryJob() {
@@ -23,10 +24,9 @@ async function sendSummariesToAllStores() {
   // Get all stores with an owner FCM token
   const { data: owners } = await supabase
     .from('users')
-    .select('store_id, fcm_token, stores(name)')
+    .select('store_id, fcm_token, email, name, stores(name)')
     .eq('role', 'owner')
-    .eq('status', 'active')
-    .not('fcm_token', 'is', null);
+    .eq('status', 'active');
 
   if (!owners?.length) return;
 
@@ -47,13 +47,26 @@ async function sendSummariesToAllStores() {
     const totalSales = shifts.reduce((sum, s) => sum + parseFloat(s.total_sales ?? 0), 0);
     const shortageCount = shifts.filter((s) => s.over_short !== null && s.over_short < -5).length;
 
-    await sendDailySummary({
-      ownerFcmToken: owner.fcm_token,
-      storeName,
-      totalSales,
-      shiftCount: shifts.length,
-      shortageCount,
-    });
+    if (owner.fcm_token) {
+      await sendDailySummary({
+        ownerFcmToken: owner.fcm_token,
+        storeName,
+        totalSales,
+        shiftCount: shifts.length,
+        shortageCount,
+      });
+    }
+
+    if (owner.email) {
+      await sendDailySummaryEmail({
+        to: owner.email,
+        ownerName: owner.name ?? 'there',
+        storeName,
+        totalSales,
+        shiftCount: shifts.length,
+        shortageCount,
+      });
+    }
   }
 }
 

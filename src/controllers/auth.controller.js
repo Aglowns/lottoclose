@@ -4,6 +4,7 @@ const supabase = require('../db/supabase');
 const { signTokens } = require('../utils/jwt');
 const { redeemInviteCode, markInviteUsed } = require('../services/invite.service');
 const { sendShiftStarted, sendCashierJoined } = require('../services/notification.service');
+const { sendWelcome, sendCashierJoinedEmail } = require('../services/email.service');
 
 // POST /auth/signup
 async function signup(req, res) {
@@ -48,6 +49,13 @@ async function signup(req, res) {
   // price book on day one. Owner can deactivate games they don't sell from
   // the Price Book screen.
   await seedStoreFromLibrary(store.id, state);
+
+  // Send welcome email (fire-and-forget)
+  sendWelcome({
+    to: email.toLowerCase().trim(),
+    ownerName: user.name,
+    storeName: store.name,
+  }).catch(() => {});
 
   const tokens = signTokens(user);
   res.status(201).json({ ...tokens, user: formatUser(user), store });
@@ -177,21 +185,32 @@ async function join(req, res) {
     .eq('id', user.store_id)
     .single();
 
-  // Notify owner that a new cashier joined
+  // Notify owner (push + email) that a new cashier joined
   const { data: owner } = await supabase
     .from('users')
-    .select('fcm_token')
+    .select('fcm_token, email, name')
     .eq('store_id', user.store_id)
     .eq('role', 'owner')
     .eq('status', 'active')
     .limit(1)
     .maybeSingle();
 
+  const storeName = store?.name ?? 'Your store';
+
   if (owner?.fcm_token) {
     sendCashierJoined({
       ownerFcmToken: owner.fcm_token,
       cashierName: user.name,
-      storeName: store?.name ?? 'Your store',
+      storeName,
+    }).catch(() => {});
+  }
+
+  if (owner?.email) {
+    sendCashierJoinedEmail({
+      to: owner.email,
+      ownerName: owner.name ?? 'there',
+      cashierName: user.name,
+      storeName,
     }).catch(() => {});
   }
 
