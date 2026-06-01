@@ -107,4 +107,31 @@ async function sendDailySummary({ ownerFcmToken, storeName, totalSales, shiftCou
   });
 }
 
-module.exports = { sendShiftClosed, sendShiftStarted, sendPackActivated, sendDailySummary };
+// Cashier joined the store via invite code
+async function sendCashierJoined({ ownerFcmToken, cashierName, storeName }) {
+  await send({
+    token: ownerFcmToken,
+    title: `${storeName} — New Team Member`,
+    body: `${cashierName} just joined your store.`,
+    data: { type: 'cashier_joined', cashierName },
+  });
+}
+
+// Cashier edited a closed shift
+async function sendShiftEdited({ ownerFcmToken, cashierName, storeName, shiftId, newOverShort }) {
+  const shortNote = newOverShort !== null && newOverShort < -5
+    ? ` · ⚠️ Short $${Math.abs(newOverShort).toFixed(2)}`
+    : newOverShort !== null && newOverShort > 5
+    ? ` · +$${newOverShort.toFixed(2)} over`
+    : '';
+
+  await send({
+    token: ownerFcmToken,
+    title: `${storeName} — Shift Updated`,
+    body: `${cashierName} edited a closed shift${shortNote}`,
+    data: { type: 'shift_edited', shiftId: String(shiftId), cashierName },
+    ...(newOverShort !== null && newOverShort < -5 ? { badge: 1 } : {}),
+  });
+}
+
+module.exports = { sendShiftClosed, sendShiftStarted, sendPackActivated, sendDailySummary, sendCashierJoined, sendShiftEdited };
