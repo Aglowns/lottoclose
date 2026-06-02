@@ -8,7 +8,7 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
-const FROM = 'LottoClose <notifications@lottoclose.app>';
+const FROM = process.env.EMAIL_FROM ?? 'LottoClose <onboarding@resend.dev>';
 
 async function send({ to, subject, html }) {
   const resend = getResend();
