@@ -1,6 +1,6 @@
 const supabase = require('../db/supabase');
 const { recalculateAndCloseShift } = require('../services/shift.service');
-const { sendPackActivated, sendShiftEdited } = require('../services/notification.service');
+const { sendPackActivated, sendShiftEdited, sendShiftStarted } = require('../services/notification.service');
 
 // POST /shifts/open
 async function openShift(req, res) {
@@ -30,6 +30,37 @@ async function openShift(req, res) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  // Notify owner that cashier tapped Start Shift
+  const { data: owner } = await supabase
+    .from('users')
+    .select('fcm_token')
+    .eq('store_id', storeId)
+    .eq('role', 'owner')
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle();
+
+  if (owner?.fcm_token) {
+    const { data: store } = await supabase
+      .from('stores')
+      .select('name')
+      .eq('id', storeId)
+      .maybeSingle();
+
+    const { data: cashier } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    sendShiftStarted({
+      ownerFcmToken: owner.fcm_token,
+      cashierName: cashier?.name ?? 'Cashier',
+      storeName: store?.name ?? 'Your store',
+    }).catch(() => {});
+  }
+
   res.status(201).json(shift);
 }
 

@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const supabase = require('../db/supabase');
 const { signTokens } = require('../utils/jwt');
 const { redeemInviteCode, markInviteUsed } = require('../services/invite.service');
-const { sendShiftStarted, sendCashierJoined } = require('../services/notification.service');
+const { sendCashierJoined } = require('../services/notification.service');
 const { sendWelcome, sendCashierJoinedEmail } = require('../services/email.service');
 
 // POST /auth/signup
@@ -133,24 +133,6 @@ async function pinLogin(req, res) {
     .select('*')
     .eq('id', user.store_id)
     .single();
-
-  // Notify owner that this cashier just clocked in
-  const { data: owner } = await supabase
-    .from('users')
-    .select('fcm_token')
-    .eq('store_id', user.store_id)
-    .eq('role', 'owner')
-    .eq('status', 'active')
-    .limit(1)
-    .maybeSingle();
-
-  if (owner?.fcm_token) {
-    sendShiftStarted({
-      ownerFcmToken: owner.fcm_token,
-      cashierName: user.name,
-      storeName: store?.name ?? 'Your store',
-    }).catch(() => {});
-  }
 
   const tokens = signTokens(user);
   res.json({ ...tokens, user: formatUser(user), store });
