@@ -9,6 +9,7 @@ const shiftRoutes = require('./src/routes/shifts.routes');
 const gamesRoutes = require('./src/routes/games.routes');
 const storeRoutes = require('./src/routes/store.routes');
 const billingRoutes = require('./src/routes/billing.routes');
+const adminRoutes = require('./src/routes/admin.routes');
 const billingController = require('./src/controllers/billing.controller');
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/v1/shifts', shiftRoutes);
 app.use('/api/v1/games', gamesRoutes);
 app.use('/api/v1/store', storeRoutes);
 app.use('/api/v1/billing', billingRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Global error handler
 app.use((err, _req, res, _next) => {
@@ -42,9 +44,11 @@ app.use((err, _req, res, _next) => {
 });
 
 const { startDailySummaryJob } = require('./src/jobs/dailySummary');
+const { startGameLibraryReminderJob } = require('./src/jobs/gameLibraryReminder');
 
 const PORT = process.env.PORT ?? 3000;
 app.listen(PORT, () => {
   console.log(`LottoClose API running on port ${PORT}`);
   startDailySummaryJob();
+  startGameLibraryReminderJob();
 });
