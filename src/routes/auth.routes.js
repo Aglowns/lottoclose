@@ -20,7 +20,7 @@ const loginSchema = z.object({
 });
 
 const pinLoginSchema = z.object({
-  storeId: z.string().uuid(),
+  userId: z.string().uuid(),
   pin: z.string().length(4),
 });
 
@@ -37,6 +37,7 @@ const refreshSchema = z.object({
 router.post('/signup', validateBody(signupSchema), ctrl.signup);
 router.post('/login', validateBody(loginSchema), ctrl.login);
 router.post('/pin-login', validateBody(pinLoginSchema), ctrl.pinLogin);
+router.get('/cashiers/:storeId', ctrl.storeCashiers);
 router.post('/join', validateBody(joinSchema), ctrl.join);
 router.post('/refresh', validateBody(refreshSchema), ctrl.refresh);
 router.get('/me', authenticate, ctrl.me);

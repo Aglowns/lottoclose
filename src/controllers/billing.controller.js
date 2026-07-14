@@ -10,6 +10,7 @@ const {
 // POST /billing/checkout-session  (owner-only)
 async function startCheckout(req, res) {
   const { storeId, sub: userId } = req.user;
+  const { successUrl, cancelUrl } = req.body ?? {};
 
   const { data: store, error: storeErr } = await supabase
     .from('stores')
@@ -26,7 +27,12 @@ async function startCheckout(req, res) {
   if (ownerErr) throw new Error(ownerErr.message);
 
   const customerId = await getOrCreateCustomer(store, owner.email);
-  const session = await createCheckoutSession({ customerId, storeId });
+  const session = await createCheckoutSession({
+    customerId,
+    storeId,
+    successUrl,
+    cancelUrl,
+  });
 
   res.json({ url: session.url, sessionId: session.id });
 }

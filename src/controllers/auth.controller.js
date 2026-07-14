@@ -105,28 +105,23 @@ async function login(req, res) {
 
 // POST /auth/pin-login
 async function pinLogin(req, res) {
-  const { storeId, pin } = req.body;
+  const { userId, pin } = req.body;
 
-  const { data: users } = await supabase
+  // Look up the ONE cashier being signed in and check the PIN against only
+  // their hash. Previously this fetched every cashier in the store and
+  // returned the first PIN match, so two cashiers who happened to pick the
+  // same PIN could log into each other's account.
+  const { data: user } = await supabase
     .from('users')
     .select('*')
-    .eq('store_id', storeId)
+    .eq('id', userId)
     .eq('role', 'cashier')
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .maybeSingle();
 
-  if (!users?.length) {
-    return res.status(401).json({ error: 'No active cashiers found for this store.' });
+  if (!user || !user.pin || !(await bcrypt.compare(pin, user.pin))) {
+    return res.status(401).json({ error: 'Incorrect PIN. Try again.' });
   }
-
-  let user = null;
-  for (const u of users) {
-    if (u.pin && await bcrypt.compare(pin, u.pin)) {
-      user = u;
-      break;
-    }
-  }
-
-  if (!user) return res.status(401).json({ error: 'Incorrect PIN. Try again.' });
 
   const { data: store } = await supabase
     .from('stores')
@@ -136,6 +131,30 @@ async function pinLogin(req, res) {
 
   const tokens = signTokens(user);
   res.json({ ...tokens, user: formatUser(user), store });
+}
+
+// GET /auth/cashiers/:storeId
+// Public list of a store's active cashiers (id + name only) so a returning
+// cashier can pick who they are before entering their PIN. Never returns
+// PINs, emails, or tokens.
+async function storeCashiers(req, res) {
+  const { storeId } = req.params;
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(storeId)) {
+    return res.status(400).json({ error: 'Invalid store id.' });
+  }
+
+  const { data: cashiers } = await supabase
+    .from('users')
+    .select('id, name')
+    .eq('store_id', storeId)
+    .eq('role', 'cashier')
+    .eq('status', 'active')
+    .order('name');
+
+  res.json({ cashiers: cashiers ?? [] });
 }
 
 // POST /auth/join
@@ -254,4 +273,4 @@ function formatUser(user) {
   return safe;
 }
 
-module.exports = { signup, login, pinLogin, join, refresh, me };
+module.exports = { signup, login, pinLogin, storeCashiers, join, refresh, me };

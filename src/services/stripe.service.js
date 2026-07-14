@@ -29,13 +29,13 @@ async function getOrCreateCustomer(store, ownerEmail) {
   return customer.id;
 }
 
-async function createCheckoutSession({ customerId, storeId }) {
+async function createCheckoutSession({ customerId, storeId, successUrl, cancelUrl }) {
   return getStripe().checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
     line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
-    success_url: process.env.STRIPE_SUCCESS_URL,
-    cancel_url: process.env.STRIPE_CANCEL_URL,
+    success_url: successUrl ?? process.env.STRIPE_SUCCESS_URL,
+    cancel_url: cancelUrl ?? process.env.STRIPE_CANCEL_URL,
     client_reference_id: storeId,
     metadata: { store_id: storeId },
   });
