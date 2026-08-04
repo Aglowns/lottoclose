@@ -4,11 +4,9 @@ const ctrl = require('../controllers/games.controller');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 const validateBody = require('../middleware/validateBody');
-const requireActiveSubscription = require('../middleware/requireActiveSubscription');
 
 const router = Router();
 router.use(authenticate);
-router.use(requireActiveSubscription);
 
 const addGameSchema = z.object({
   gameNumber: z.number().int().positive(),
