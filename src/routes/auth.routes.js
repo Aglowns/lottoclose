@@ -41,5 +41,6 @@ router.get('/cashiers/:storeId', ctrl.storeCashiers);
 router.post('/join', validateBody(joinSchema), ctrl.join);
 router.post('/refresh', validateBody(refreshSchema), ctrl.refresh);
 router.get('/me', authenticate, ctrl.me);
+router.delete('/account', authenticate, ctrl.deleteAccount);
 
 module.exports = router;

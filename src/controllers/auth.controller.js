@@ -268,9 +268,58 @@ async function me(req, res) {
   res.json({ user: formatUser(user), store });
 }
 
+// DELETE /auth/account
+// Lets a signed-in user delete their own account and data (App Store Guideline
+// 5.1.1(v)). Owner => the whole store and everything under it. Cashier => just
+// their own user and their shifts. FKs don't cascade (except shift_scans), so
+// children are removed before parents.
+async function deleteAccount(req, res) {
+  const { sub: userId, storeId, role } = req.user;
+
+  if (role === 'owner') {
+    let r;
+    r = await supabase.from('carryover').delete().eq('store_id', storeId);
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('shifts').delete().eq('store_id', storeId); // cascades shift_scans
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('games').delete().eq('store_id', storeId); // store games only (library rows have store_id null)
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('invite_codes').delete().eq('store_id', storeId);
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('users').delete().eq('store_id', storeId);
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('stores').delete().eq('id', storeId);
+    if (r.error) throw new Error(r.error.message);
+  } else {
+    const { data: myShifts, error: sErr } = await supabase
+      .from('shifts')
+      .select('id')
+      .eq('user_id', userId);
+    if (sErr) throw new Error(sErr.message);
+    const shiftIds = (myShifts ?? []).map((s) => s.id);
+
+    let r;
+    if (shiftIds.length) {
+      r = await supabase
+        .from('carryover')
+        .update({ last_shift_id: null })
+        .in('last_shift_id', shiftIds);
+      if (r.error) throw new Error(r.error.message);
+    }
+    r = await supabase.from('shifts').delete().eq('user_id', userId); // cascades shift_scans
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('invite_codes').update({ used_by: null }).eq('used_by', userId);
+    if (r.error) throw new Error(r.error.message);
+    r = await supabase.from('users').delete().eq('id', userId);
+    if (r.error) throw new Error(r.error.message);
+  }
+
+  res.json({ deleted: true });
+}
+
 function formatUser(user) {
   const { password_hash, pin, ...safe } = user;
   return safe;
 }
 
-module.exports = { signup, login, pinLogin, storeCashiers, join, refresh, me };
+module.exports = { signup, login, pinLogin, storeCashiers, join, refresh, me, deleteAccount };
